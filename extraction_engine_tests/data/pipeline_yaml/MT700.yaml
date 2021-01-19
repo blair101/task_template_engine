@@ -1,0 +1,5020 @@
+document_type: MT700
+pre:
+  define:
+    TERM_CHARS: &TERM_CHARS '((\:|t)\s?\d+[A-Z]?\s?\:)|(^\*\*)|(^F$)' # t is to fix error such as t47A:
+    TERM_CHARS_B: &TERM_CHARS_B '((\:|t)\s?\d+[A-Z]?\s?\:)|(^\*\*)|(\s?\*)' # t is to fix error such as t47A:
+    SEE_FIELD: &SEE_FIELD '(\(?.*see\s*(field)?\s*\d+[A-Z]?\)?.*)|(\(?.*see\s*tag\s*\d+[A-Z]?\)?.*)'
+    MAX_LINES: &MAX_LINES 100
+    SIMPLE_DATE_REGEX: &SIMPLE_DATE_REGEX '[1-2][0-9][\d][\d][0-3]?[0-9]'
+    JQ_FIRST_VALUE: &JQ_FIRST_VALUE 'del(.value) + {value: [.value[0]]}'
+    JQ_AFTER_FIRST_VALUE: &JQ_AFTER_FIRST_VALUE 'del(.value) + {value: .value[1:]}'
+    TEL_FAX_REGEX: &TEL_FAX_REGEX '((TEL|FAX)(:|.)([\d\-\ ])+[\ \t\,\/\.\-]*)+'
+    TOKEN_REGEX: &TOKEN_REGEX '(?<!(\d\/|\/\d))\d+\)|(\+)|(\d+\.[\ ])'
+    QUANTITY_GOODS_REGEX: &QUANTITY_GOODS_REGEX '(?:([\d.,\ ]|(\dX))+([\ \t\:])(PALLETS?|PIECES?|PCS?|CONTAINERS?|KGS?|MTS?|COILS?|CARTONS?|LITRES?|METRES?|M|(CUBIC|SQUARE)\s?METRES?|SQM|CM|CM3|M2|M3|TONS?|PAIRS?|PACKS?|PACKAGES?)([\ \t])+(OF)*([\ \t])*)(.*)'
+    JQ_FIRST_KEY: &JQ_FIRST_KEY '.[0]'
+  resources:
+    - ports
+    - countries
+    - currencies
+    - field_range
+fields:
+  - field_code: F_MT700_Pre_Flatten
+    skip_definite_action_check: true
+    root:
+      type: chain
+      children:
+        - pipeline: flatten
+          params:
+            action: documents_to_flatten
+            inputs:
+              context: document
+            outputs:
+              X: state.flatten
+        - pipeline: flatten
+          params:
+            action: filter_header
+            inputs:
+              context: state.flatten
+            outputs:
+              X: state.flatten
+            pattern: 'SW REF|^\{\d\:|ISSUE\s?OF\s?A\s?DOCUMENTARY\s?CREDIT'
+            include: False
+        - pipeline: flatten
+          params:
+            action: filter_header
+            inputs:
+              context: state.flatten
+            outputs:
+              X: intermediate.flatten
+            pattern: page\s?\d+\s?of\s?\d+
+            include: False
+            header: False # filter footer from each page
+        - pipeline: utils
+          params:
+            action: json_to_output
+            inputs:
+              context: intermediate.flatten
+            output_name: 'Pre_MT700_Flatten'
+
+  - field_code: F_MT700_2
+    root:
+      type: any
+      children:
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: True
+                include_start: True
+                include_end: False
+                key: '\:\s?40A\s?\:\s?FORM\s?OF\s?DOCUMENTARY\s?CREDIT' # find the key
+                term_chars: *TERM_CHARS #'default to $ if term chars is empty for multilines
+                max_line: 2
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: False
+                key: '\:\s?40A\s?\:' # find the key
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+  - field_code: F_MT700_3
+    root:
+      type: any
+      children:
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: True
+                include_start: True
+                include_end: False
+                key: '\:\s?20\s?\:\s?DOCUMENTARY\s?CREDIT\s?NUMBER' # find the key
+                term_chars: *TERM_CHARS # 'default to $ if term chars is empty for multilines
+                max_line: 2
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: False
+                key: '\:\s?20\s?\:' # find the key
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+  - field_code: PRE_F_MT700_7_8
+    skip_definite_action_check: true
+    root:
+      type: any
+      children:
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: intermediate.expiry_date_place
+                multi_line: True
+                include_start: True
+                include_end: False
+                key: '\:?\s?31D\s?\:?\s?DATE\s?AND\s?PLACE\s?OF\s?EXP(I|T)RY' # find the key
+                term_chars: *TERM_CHARS # 'default to $ if term chars is empty for multilines
+                max_line: 3
+                flags:
+                  ignorecase: True
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: intermediate.expiry_date_place
+                multi_line: False
+                key: '(\:\s?31D\s?\:)' # find the key
+                flags:
+                  ignorecase: True
+  - field_code: F_MT700_7
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.expiry_date_place
+        - pipeline: regex
+          name:
+          params:
+            action: match_filter
+            inputs:
+              context: intermediate.expiry_date_place
+            outputs:
+              X: state.found
+            pattern: *SIMPLE_DATE_REGEX
+            flags:
+              ignorecase: True
+        - pipeline: resolver
+          params:
+            action: match_simple_kv_resolver
+            inputs:
+              match_kv: state.found
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            confidence: 0.99
+  - field_code: F_MT700_8
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.expiry_date_place
+        - pipeline: regex
+          name:
+          params:
+            action: match_filter
+            inputs:
+              context: intermediate.expiry_date_place
+            outputs:
+              X: state.found
+            pattern: '([1-2][0-9][\d][\d][0-3][0-9])(.*)'
+            group: 2
+            flags:
+              ignorecase: True
+        - pipeline: resolver
+          params:
+            action: match_simple_kv_resolver
+            inputs:
+              match_kv: state.found
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            confidence: 0.99
+  - field_code: F_MT700_9
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: regex
+          params:
+            action: regex_key_value
+            inputs:
+              context: intermediate.flatten
+            outputs:
+              X: state.found
+            multi_line: False
+            key: '\:\s?51(D|A)\s?\:' # find the key
+            flags:
+              ignorecase: True
+        - pipeline: resolver
+          params:
+            action: match_simple_kv_resolver
+            inputs:
+              match_kv: state.found
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            confidence: 0.99
+  - field_code: PRE_F_MT700_10_11_12_13
+    skip_definite_action_check: true
+    root:
+      type: any
+      children:
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: intermediate.applicant
+                multi_line: True
+                include_start: True
+                include_end: False
+                key: '\:\s?(50)\s?\:\s?APPLICANT' # find the key
+                term_chars: *TERM_CHARS # 'default to $ if term chars is empty for multilines
+                max_line: 5
+                flags:
+                  ignorecase: True
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: intermediate.applicant
+                multi_line: True
+                include_start: True
+                include_end: False
+                term_chars: *TERM_CHARS_B # 'default to $ if term chars is empty for multilines
+                key: '\:\s?(50)\s?\:' # find the key
+                max_line: 5
+                flags:
+                  ignorecase: True
+  - field_code: F_MT700_10
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.applicant
+        - pipeline: regex
+          params:
+            action: jq_match_filter
+            inputs:
+              context: intermediate.applicant
+            outputs:
+              X: state.jq_filter
+            jq_pattern: *JQ_FIRST_VALUE
+        - pipeline: regex
+          name:
+          params:
+            action: match_filter
+            inputs:
+              context: state.jq_filter
+            outputs:
+              X: state.found
+            pattern: '^((?!\d).)*$' # match if does not contain digits
+            flags:
+              ignorecase: True
+        - pipeline: resolver
+          params:
+            action: match_simple_kv_resolver
+            inputs:
+              match_kv: state.found
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            confidence: 0.99
+  - field_code: F_MT700_11
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.applicant
+        - type: any
+          children:
+          - type: chain
+            children:
+              - pipeline: regex
+                params:
+                  action: match_filter
+                  inputs:
+                    context: intermediate.applicant
+                  outputs:
+                    X: state.applicant
+                  pattern: '^((?!see\s?field).)*$' # not in see field
+              - pipeline: regex
+                params:
+                  action: match_filter
+                  inputs:
+                    context: state.applicant
+                  outputs:
+                    X: state.applicant
+                  pattern: '^((?!N\.?P\.?W\.?P).)*$'
+              - pipeline: regex
+                params:
+                  action: jq_match_filter
+                  inputs:
+                    context: state.applicant
+                  outputs:
+                    X: state.jq_filter
+                  jq_pattern: *JQ_AFTER_FIRST_VALUE
+              - pipeline: flatten
+                params:
+                  action: match_kv_to_flatten
+                  inputs:
+                    context: intermediate.flatten
+                    match_kv: state.jq_filter
+                  outputs:
+                    X: state.flatten
+                  filter_type: value
+              - pipeline: merge
+                params:
+                  action: merge_nodes
+                  inputs:
+                    context: state.flatten
+                  outputs:
+                    X: intermediate.applicant_address
+              - pipeline: regex
+                params:
+                  action: regex_search_merged_nodes
+                  inputs:
+                    context: intermediate.applicant_address
+                  outputs:
+                    X: state.result
+                  pattern: '.*'
+                  flags:
+                    ignorecase: false
+              - pipeline: resolver
+                params:
+                  action: merge_resolver
+                  return_type: 'string'
+                  inputs:
+                    match_kv: state.result
+                  outputs:
+                    value: field.value
+                    parsed_value: field.parse_value
+                    mappings: field.mappings
+                    ocr_confidence: field.ocr_confidence
+                    extraction_confidence: field.extraction_confidence
+                    type: field.type
+                  confidence: 0.75
+          - type: chain
+            children:
+              - pipeline: regex
+                params:
+                  action: match_filter
+                  inputs:
+                    context: intermediate.applicant # get the the address if first line is not name
+                  outputs:
+                    X: state.match_filter
+                  pattern: *SEE_FIELD # match field 47A
+                  flags:
+                    ignorecase: True
+              - pipeline: resolver
+                params:
+                  action: match_simple_kv_resolver
+                  inputs:
+                    match_kv: state.match_filter
+                    context: intermediate.flatten
+                  outputs:
+                    value: field.value
+                    parsed_value: field.parsed_value
+                    mappings: field.mappings
+                    ocr_confidence: field.ocr_confidence
+                    extraction_confidence: field.extraction_confidence
+                    type: field.type
+                  single_line: True
+                  confidence: 0.99
+
+  - field_code: F_MT700_13
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - type: any
+          children:
+          - type: chain
+            children:
+              - pipeline: utils
+                params:
+                  action: check_null
+                  inputs:
+                    context: intermediate.applicant_address
+                  get: text
+              - pipeline: regex
+                params:
+                  action: regex_search_merged_nodes
+                  inputs:
+                    context: intermediate.applicant_address
+                  outputs:
+                    X: state.result
+                  pattern: *TEL_FAX_REGEX
+                  flags:
+                    ignorecase: false
+              - pipeline: resolver
+                params:
+                  action: merge_resolver
+                  return_type: 'string'
+                  inputs:
+                    match_kv: state.result
+                  outputs:
+                    value: field.value
+                    parsed_value: field.parse_value
+                    mappings: field.mappings
+                    ocr_confidence: field.ocr_confidence
+                    extraction_confidence: field.extraction_confidence
+                    type: field.type
+                  confidence: 0.75
+          - type: chain
+            children:
+              - pipeline: utils
+                params:
+                  action: check_null
+                  inputs:
+                    context: intermediate.applicant
+                  get: text
+              - pipeline: regex
+                params:
+                  action: match_filter
+                  inputs:
+                    context: intermediate.applicant
+                  outputs:
+                    X: state.applicant
+                  pattern: '^((?!address).)*$' # not in see 
+                  flags:
+                      ignorecase: True
+              - pipeline: regex
+                params:
+                  action: match_filter
+                  inputs:
+                    context: state.applicant # get the the address if first line is not name
+                  outputs:
+                    X: state.match_filter
+                  pattern: *SEE_FIELD # match field 47A
+                  flags:
+                    ignorecase: True
+              - pipeline: resolver
+                params:
+                  action: match_simple_kv_resolver
+                  inputs:
+                    match_kv: state.match_filter
+                    context: intermediate.flatten
+                  outputs:
+                    value: field.value
+                    parsed_value: field.parsed_value
+                    mappings: field.mappings
+                    ocr_confidence: field.ocr_confidence
+                    extraction_confidence: field.extraction_confidence
+                    type: field.type
+                  single_line: True
+                  confidence: 0.99
+
+  - field_code: F_MT700_12
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.applicant
+        - type: any
+          children:
+          - pipeline: regex
+            params:
+              action: match_filter_list
+              inputs:
+                context: intermediate.applicant
+                resource_list: resources.countries
+              outputs:
+                X: state.match_filter
+              flags:
+                ignorecase: True
+          - pipeline: regex # exact match with boundaries
+            params:
+              action: match_filter
+              inputs:
+                context: intermediate.applicant # get the the address if first line is not name
+              outputs:
+                X: state.match_filter
+              pattern: *SEE_FIELD # match field 47A
+              flags:
+                ignorecase: True
+          - pipeline: regex
+            params:
+              action: match_filter
+              inputs:
+                context: intermediate.applicant # get the the address if first line is not name
+              outputs:
+                X: state.match_filter
+              pattern: 'address\s?see\s?\d+a' # match field 47A
+              flags:
+                ignorecase: True
+          - pipeline: regex # use partial match in worst case scenario
+            params:
+              action: match_filter_list
+              inputs:
+                context: intermediate.applicant
+                resource_list: resources.countries 
+              outputs:
+                X: state.match_filter
+              flags:
+                ignorecase: True        
+              partial_match: True
+        - pipeline: resolver
+          params:
+            action: match_simple_kv_resolver
+            inputs:
+              match_kv: state.match_filter
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            single_line: True
+            confidence: 0.99
+
+
+
+  - field_code: PRE_F_MT700_14_15_16
+    skip_definite_action_check: true
+    root:
+      type: any
+      children:
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: intermediate.beneficiary
+                multi_line: True
+                include_start: True
+                include_end: False
+                key: '\:?\s?59\s?\:?\s?BENEFICIARY' # find the key
+                term_chars: *TERM_CHARS # 'default to $ if term chars is empty for multilines
+                max_line: 6
+                flags:
+                  ignorecase: True
+            - pipeline: regex
+              params:
+                action: match_filter
+                inputs:
+                  context: intermediate.beneficiary # handle non stripped text
+                outputs:
+                  X: intermediate.beneficiary
+                pattern: '^((?!^\s+$).)*$' # match if it is not empty
+                flags:
+                  ignorecase: True
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: intermediate.beneficiary
+                multi_line: True
+                include_start: True
+                include_end: False
+                key: '\:\s?(59)\s?\:' # find the key
+                term_chars: *TERM_CHARS_B # 'default to $ if term chars is empty for multilines
+                max_line: 5
+                flags:
+                  ignorecase: True
+            - pipeline: regex
+              params:
+                action: match_filter
+                inputs:
+                  context: intermediate.beneficiary # handle non stripped text
+                outputs:
+                  X: intermediate.beneficiary
+                pattern: '^((?!^\s+$).)*$' # match if it is not empty
+                flags:
+                  ignorecase: True
+  - field_code: F_MT700_14
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.beneficiary
+        - pipeline: regex
+          params:
+            action: jq_match_filter
+            inputs:
+              context: intermediate.beneficiary
+            outputs:
+              X: state.found
+            jq_pattern: *JQ_FIRST_VALUE
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: regex
+          params:
+            action: match_filter
+            inputs:
+              context: state.found
+            outputs:
+              X: state.found
+            pattern: '^((?!\d).)*$' # match if does not contain digits
+            flags:
+              ignorecase: True
+        - pipeline: resolver
+          params:
+            action: match_simple_kv_resolver
+            inputs:
+              match_kv: state.found
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            confidence: 0.99
+
+  - field_code: PRE_F_MT00_15
+    skip_definite_action_check: true
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.beneficiary
+        - pipeline: regex
+          params:
+            action: jq_match_filter
+            inputs:
+              context: intermediate.beneficiary
+            outputs:
+              X: state.found
+            jq_pattern: *JQ_FIRST_VALUE
+        - type: any
+          children:
+            - type: chain
+              children:
+                - pipeline: utils
+                  params:
+                    action: do_pass
+                - pipeline: regex
+                  params:
+                    action: match_filter
+                    inputs:
+                      context: state.found
+                    outputs:
+                      X: state.found
+                    pattern: '^((?!\d).)*$' # match if does not contain digits
+                    flags:
+                      ignorecase: True
+                - pipeline: regex
+                  params:
+                    action: jq_match_filter
+                    inputs:
+                      context: intermediate.beneficiary # get the rest of the address
+                    outputs:
+                      X: state.beneficiary_details
+                    jq_pattern: *JQ_AFTER_FIRST_VALUE
+                - pipeline: regex
+                  name:
+                  params:
+                    action: match_filter
+                    inputs:
+                      context: state.beneficiary_details
+                    outputs:
+                      X: intermediate.beneficiary_details
+                    pattern: '^((?!(PT.|limited|ltd|sdn|bhd)).)*$' # match if does not contain ltd
+                    flags:
+                      ignorecase: True
+            - type: chain
+              children:
+                - pipeline: utils
+                  params:
+                    action: do_pass
+                - pipeline: regex
+                  name:
+                  params:
+                    action: match_filter
+                    inputs:
+                      context: intermediate.beneficiary # get the the address if first line is not name
+                    outputs:
+                      X: state.beneficiary_details
+                    pattern: '.*' # match all
+                    flags:
+                      ignorecase: True
+                - pipeline: regex
+                  name:
+                  params:
+                    action: match_filter
+                    inputs:
+                      context: state.beneficiary_details
+                    outputs:
+                      X: intermediate.beneficiary_details
+                    pattern: '^((?!(PT|limited|ltd|sdn|bhd)).)*$' # match if does not contain company name
+
+
+  - field_code: F_MT700_15
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.beneficiary_details
+        - pipeline: regex
+          name:
+          params:
+            action: match_filter
+            inputs:
+              context: intermediate.beneficiary_details
+            outputs:
+              X: state.found
+            pattern: '.*' # match all
+            flags:
+              ignorecase: True
+        - pipeline: resolver
+          params:
+            action: match_simple_kv_resolver
+            inputs:
+              match_kv: state.found
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            confidence: 0.99
+  - field_code: F_MT700_16
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.beneficiary
+        - type: any
+          children:
+            - type: chain
+              children:
+                - pipeline: regex
+                  params:
+                    action: match_filter_list
+                    inputs:
+                      context: intermediate.beneficiary
+                      resource_list: resources.countries
+                    outputs:
+                      X: state.match_filter
+                    flags:
+                      ignorecase: True
+                - pipeline: regex
+                  params:
+                    action: jq_match_filter
+                    inputs:
+                      context: state.match_filter
+                    outputs:
+                      X: state.match_filter
+                    jq_pattern: *JQ_FIRST_VALUE
+                - pipeline: resolver
+                  params:
+                    action: match_simple_kv_resolver
+                    inputs:
+                      match_kv: state.match_filter
+                      context: intermediate.flatten
+                    outputs:
+                      value: field.value
+                      parsed_value: field.parsed_value
+                      mappings: field.mappings
+                      ocr_confidence: field.ocr_confidence
+                      extraction_confidence: field.extraction_confidence
+                      type: field.type
+                    confidence: 0.99
+            - type: chain
+              children:
+                - pipeline: regex
+                  params:
+                    action: match_filter
+                    inputs:
+                      context: intermediate.beneficiary 
+                    outputs:
+                      X: state.match_filter
+                    pattern: *SEE_FIELD # match field 47A
+                    flags:
+                      ignorecase: True
+                - pipeline: resolver
+                  params:
+                    action: match_simple_kv_resolver
+                    inputs:
+                      match_kv: state.match_filter
+                      context: intermediate.flatten
+                    outputs:
+                      value: field.value
+                      parsed_value: field.parsed_value
+                      mappings: field.mappings
+                      ocr_confidence: field.ocr_confidence
+                      extraction_confidence: field.extraction_confidence
+                      type: field.type
+                    single_line: True
+                    confidence: 0.99
+            - type: chain
+              children:
+                - pipeline: regex
+                  params:
+                    action: match_filter
+                    inputs:
+                      context: intermediate.beneficiary # get the the address if first line is not name
+                    outputs:
+                      X: state.match_filter
+                    pattern: 'address\s?see\s?\d+a' # match field 47A
+                    flags:
+                      ignorecase: True
+                - pipeline: resolver
+                  params:
+                    action: match_simple_kv_resolver
+                    inputs:
+                      match_kv: state.match_filter
+                      context: intermediate.flatten
+                    outputs:
+                      value: field.value
+                      parsed_value: field.parsed_value
+                      mappings: field.mappings
+                      ocr_confidence: field.ocr_confidence
+                      extraction_confidence: field.extraction_confidence
+                      type: field.type
+                    single_line: True
+                    confidence: 0.99
+            - type: chain # partial match in worst case scenario
+              children:
+                - pipeline: regex
+                  params:
+                    action: match_filter_list
+                    inputs:
+                      context: intermediate.beneficiary
+                      resource_list: resources.countries
+                    outputs:
+                      X: state.match_filter
+                    flags:
+                      ignorecase: True
+                    partial_match: True  
+                - pipeline: regex
+                  params:
+                    action: jq_match_filter
+                    inputs:
+                      context: state.match_filter
+                    outputs:
+                      X: state.match_filter
+                    jq_pattern: *JQ_FIRST_VALUE
+                - pipeline: resolver
+                  params:
+                    action: match_simple_kv_resolver
+                    inputs:
+                      match_kv: state.match_filter
+                      context: intermediate.flatten
+                    outputs:
+                      value: field.value
+                      parsed_value: field.parsed_value
+                      mappings: field.mappings
+                      ocr_confidence: field.ocr_confidence
+                      extraction_confidence: field.extraction_confidence
+                      type: field.type
+                    confidence: 0.99
+  - field_code: F_MT700_17
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - type: any
+          children:
+            - type: chain
+              children:
+                - pipeline: utils
+                  params:
+                    action: check_null
+                    inputs:
+                      context: intermediate.beneficiary_details
+                - pipeline: regex
+                  name:
+                  params:
+                    action: match_filter
+                    inputs:
+                      context: intermediate.beneficiary_details
+                    outputs:
+                      X: state.found
+                    pattern: '((tel|phn?|phone|fax|fx))([: ]*)([\d\- +()/]+)' # match phone number
+                    group: 4
+                    flags:
+                      ignorecase: True
+                - pipeline: resolver
+                  params:
+                    action: match_simple_kv_resolver
+                    inputs:
+                      match_kv: state.found
+                      context: intermediate.flatten
+                    outputs:
+                      value: field.value
+                      parsed_value: field.parsed_value
+                      mappings: field.mappings
+                      ocr_confidence: field.ocr_confidence
+                      extraction_confidence: field.extraction_confidence
+                      type: field.type
+                    confidence: 0.99
+            - type: chain
+              children:
+                - pipeline: utils
+                  params:
+                    action: check_null
+                    inputs:
+                      context: intermediate.beneficiary
+                - pipeline: regex
+                  params:
+                    action: match_filter
+                    inputs:
+                      context: intermediate.beneficiary
+                    outputs:
+                      X: state.beneficiary
+                    pattern: '^((?!address).)*$' # not in see field
+                    flags:
+                        ignorecase: True
+                - pipeline: regex
+                  params:
+                    action: match_filter
+                    inputs:
+                      context: state.beneficiary
+                    outputs:
+                      X: state.match_filter
+                    pattern: *SEE_FIELD # match field 47A
+                    flags:
+                      ignorecase: True
+                - pipeline: resolver
+                  params:
+                    action: match_simple_kv_resolver
+                    inputs:
+                      match_kv: state.match_filter
+                      context: intermediate.flatten
+                    outputs:
+                      value: field.value
+                      parsed_value: field.parsed_value
+                      mappings: field.mappings
+                      ocr_confidence: field.ocr_confidence
+                      extraction_confidence: field.extraction_confidence
+                      type: field.type
+                    single_line: True
+                    confidence: 0.99
+
+  - field_code: PRE_F_MT700_18_19
+    skip_definite_action_check: true
+    root:
+      type: any
+      children:
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: intermediate.currency_amount
+                multi_line: True
+                include_start: True
+                include_end: False
+                key: '\:\s?32B\s?\:\s?CURRENCY\s?CODE\,?\s?AMOUNT' # find the key
+                term_chars: *TERM_CHARS # 'default to $ if term chars is empty for multilines
+                max_line: 2
+                flags:
+                  ignorecase: True
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: intermediate.currency_amount
+                multi_line: True
+                include_start: True
+                include_end: False
+                key: '32B\s?CURRENCY\s?CODE\,?\s?AMOUNT' # find the key
+                term_chars: *TERM_CHARS 
+                max_line: 2
+                flags:
+                  ignorecase: True
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: intermediate.currency_amount
+                multi_line: False
+                key: '(\:\s?32B\s?\:)' # find the key
+                flags:
+                  ignorecase: True
+  - field_code: F_MT700_18
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.currency_amount
+        - pipeline: regex
+          params:
+            action: match_filter_list
+            inputs:
+              context: intermediate.currency_amount
+              resource_list: resources.currencies
+            outputs:
+              X: state.match_filter
+            flags:
+              ignorecase: True
+        - pipeline: resolver
+          params:
+            action: match_simple_kv_resolver
+            inputs:
+              match_kv: state.match_filter
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            confidence: 0.99
+  - field_code: F_MT700_19
+    root:
+      type: chain
+      children:
+      - pipeline: utils
+        params:
+          action: check_null
+          inputs:
+            context: intermediate.currency_amount
+      - pipeline: regex
+        name:
+        params:
+          action: match_filter
+          inputs:
+            context: intermediate.currency_amount
+          outputs:
+            X: state.match_filter
+          pattern: '([A-Z]+)([0-9\.,\s]+)(\s*)'
+          group: 2
+          flags:
+            ignorecase: True
+      - pipeline: resolver
+        params:
+          action: match_simple_kv_resolver
+          inputs:
+            match_kv: state.match_filter
+            context: intermediate.flatten
+          outputs:
+            value: field.value
+            parsed_value: field.parsed_value
+            mappings: field.mappings
+            ocr_confidence: field.ocr_confidence
+            extraction_confidence: field.extraction_confidence
+            type: field.type
+          return_type: float
+          confidence: 0.99
+  - field_code: F_MT700_20
+    root:
+      type: any
+      children:
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: True
+                include_start: True
+                include_end: False
+                key: '\:\s?39A\s?\:\s?PERCENTAGE\s?CREDIT\s?AMOUNT\s?TOLERANCE' # find the key
+                term_chars: *TERM_CHARS # 'default to $ if term chars is empty for multilines
+                max_line: 2
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: False
+                key: '\:\s?39A\s?\:' # find the key
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+
+  - field_code: F_MT700_23
+    root:
+      type: any
+      children:
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: True
+                include_start: True
+                include_end: False
+                key: '\:\s?42C\s?\:\s?DRAFTS\s?AT\s?(\.*)' # find the key
+                term_chars: *TERM_CHARS # 'default to $ if term chars is empty for multilines
+                max_line: 5
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: True
+                key: '\:\s?42C\s?\:' # find the key
+                include_start: True
+                include_end: False
+                term_chars: *TERM_CHARS
+                flags:
+                  ignorecase: True
+            - pipeline: regex
+              name:
+              params:
+                action: match_filter
+                inputs:
+                  context: state.found
+                outputs:
+                  X: state.found
+                pattern: ((\.+)\s+)?(.*) # remove .. from '... at right'
+                flags:
+                  ignorecase: True
+                group: 3
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+
+  - field_code: F_MT700_24
+    root:
+      type: any
+      children:
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: True
+                include_start: True
+                include_end: False
+                key: '\:\s?(42A)\s?\:\s?DRAWEE' # find the key
+                term_chars: *TERM_CHARS # 'default to $ if term chars is empty for multilines
+                max_line: 2
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: False
+                key: '\:\s?(42A)\s?\:' # find the key
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+
+
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: True
+                include_start: True
+                include_end: False
+                key: '\:\s?(42D)\s?\:\s?DRAWEE' # find the key
+                term_chars: *TERM_CHARS # 'default to $ if term chars is empty for multilines
+                max_line: 2
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: True
+                key: '\:\s?(42D)\s?\:' # find the key
+                include_start: True
+                include_end: False
+                term_chars: '\*' # 'default to $ if term chars is empty for multilines
+                max_line: 2
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+
+
+  - field_code: F_MT700_27
+    root:
+      type: any
+      children:
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: True
+                include_start: True
+                include_end: False
+                key: '\:\s?43P\s?\:\s?PARTIAL\s?SHIPMENTS' # find the key
+                term_chars: *TERM_CHARS # 'default to $ if term chars is empty for multilines
+                max_line: 2
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: False
+                key: '\:\s?43P\s?\:' # find the key
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+  - field_code: F_MT700_29 # LACK OF RESULT FOR THE OTHER CASES
+    root:
+      type: chain
+      children:
+        - pipeline: regex
+          params:
+            action: regex_key_value
+            inputs:
+              context: intermediate.flatten
+            outputs:
+              X: state.found
+            multi_line: True
+            include_start: True
+            include_end: False
+            key: '\s?(\:|t)44A\s?(\:|\;)' # find the key
+            term_chars: *TERM_CHARS # 'default to $ if term chars is empty for multilines
+            max_line: 3
+            flags:
+              ignorecase: True
+        - pipeline: resolver
+          params:
+            action: match_simple_kv_resolver
+            inputs:
+              match_kv: state.found
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            confidence: 0.99
+  - field_code: F_MT700_30
+    root:
+      type: any
+      children:
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: True
+                include_start: True
+                include_end: False
+                key: '\:\s?44E\s?\:\s?PORT\s?OF\s?LOADING\s?.{0,2}AIRPORT\s?OF\s?DEPARTURE' # find the key
+                term_chars: *TERM_CHARS # 'default to $ if term chars is empty for multilines
+                max_line: 2
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: True
+                include_start: True
+                include_end: False
+                key: '\:\s?44E\s?\:' # find the key
+                term_chars: *TERM_CHARS # 'default to $ if term chars is empty for multilines
+                max_line: 2
+                flags:
+                  ignorecase: False
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: False
+                key: '\:\s?44E\s?\:' # find the key
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+  - field_code: F_MT700_31
+    root:
+      type: any
+      children:
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: True
+                include_start: True
+                include_end: False
+                key: '\:\s?44F\s?\:\s?PORT\s?OF\s?DISCHARGE\s?.{0,2}AIRPORT\s?OF\s?DESTINATION' # find the key
+                term_chars: *TERM_CHARS # 'default to $ if term chars is empty for multilines
+                max_line: 2
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: False
+                key: '\:\s?44F\s?\:' # find the key
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: True
+                include_start: True
+                include_end: False
+                key: '\:\s?44F\s?\:' # find the key
+                term_chars: '\*' # 'default to $ if term chars is empty for multilines
+                max_line: 2
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+  - field_code: F_MT700_32 # lack of example
+    root:
+      type: chain
+      children:
+        - pipeline: regex
+          params:
+            action: regex_key_value
+            inputs:
+              context: intermediate.flatten
+            outputs:
+              X: state.found
+            multi_line: True
+            include_start: True
+            include_end: False
+            key: '(\:|t)\s?44B\s?\:' # find the key
+            term_chars: '\*'  # 'default to $ if term chars is empty for multilines
+            max_line: 2
+            flags:
+              ignorecase: True
+        - pipeline: resolver
+          params:
+            action: match_simple_kv_resolver
+            inputs:
+              match_kv: state.found
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            confidence: 0.99
+  - field_code: F_MT700_33
+    root:
+      type: any
+      children:
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: True
+                include_start: True
+                include_end: False
+                key: '\:\s?44C\s?\:\s?LATEST\s?DATE\s?OF\s?SHIPMENT' # find the key
+                term_chars: *TERM_CHARS # 'default to $ if term chars is empty for multilines
+                max_line: 2
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: False
+                key: '\:\s?44C\s?\:' # find the key
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: True
+                include_start: True
+                include_end: False
+                key: '\:\s?44C\s?\:' # find the key
+                term_chars: '\*' # 'default to $ if term chars is empty for multilines
+                max_line: 2
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+
+  - field_code: F_MT700_35
+    root:
+      type: any
+      children:
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: True
+                include_start: True
+                include_end: False
+                key: '\:\s?45A\s?\:\s?DESCRIPTION\s?OF\s?GOODS\s?AND\/OR\s?SERVICES' # find the key
+                term_chars: *TERM_CHARS # 'default to $ if term chars is empty for multilines
+                max_line: 50
+                flags:
+                  ignorecase: True
+            - pipeline: flatten
+              params:
+                action: match_kv_to_flatten
+                inputs:
+                  context: intermediate.flatten
+                  match_kv: state.found
+                outputs:
+                  X: intermediate.PRE_F_MT700_35
+            - pipeline: utils
+              params:
+                action: json_to_output
+                inputs:
+                  context: intermediate.PRE_F_MT700_35
+                output_name: 'F_MT700_35'
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: True
+                include_start: True
+                include_end: False
+                key: '\:\s?45A\s?\:' # find the key
+                term_chars: '\*' # 'default to $ if term chars is empty for multilines
+                max_line: 50
+                flags:
+                  ignorecase: True
+            - pipeline: flatten
+              params:
+                action: match_kv_to_flatten
+                inputs:
+                  context: intermediate.flatten
+                  match_kv: state.found
+                outputs:
+                  X: intermediate.PRE_F_MT700_35
+            - pipeline: utils
+              params:
+                action: json_to_output
+                inputs:
+                  context: intermediate.PRE_F_MT700_35
+                output_name: 'F_MT700_35'
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+
+  - field_code: F_MT700_35G
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.PRE_F_MT700_35
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.PRE_F_MT700_35
+            outputs:
+              X: state.filter
+            filter_key: text
+            pattern: '^((?!sub).)*$' # exclude  'SUB' in sub total
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.filter
+            outputs:
+              X: state.filter
+            filter_key: text
+            pattern: 'amount.*usd.*\d$'
+        - pipeline: regex
+          params:
+            action: regex_search
+            inputs:
+              context: state.filter
+            outputs:
+              X: state.found
+            pattern:  '[0-9\.,]+$' # search for digits
+            flags:
+              ignorecase: True
+        - pipeline: regex
+          params:
+            action: jq_match_filter
+            inputs:
+              context: state.found
+            outputs:
+              X: state.found
+            jq_pattern: *JQ_FIRST_KEY
+            iterate: False
+        - pipeline: resolver
+          params:
+            action: match_simple_resolver_single_key
+            inputs:
+              match_kv: state.found
+            outputs:
+              value: field.value
+              parsed_value: field.parse_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            confidence: 0.8
+            return_type: float
+
+  - field_code: F_MT700_35A
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.PRE_F_MT700_35
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.PRE_F_MT700_35
+            outputs:
+              X: state.PRE_F_MT700_35
+            filter_key: text
+            pattern: '^((?!pack).)*$' # exclude  'packed in 25 kg ...'
+        - type: any
+          children:
+            - type: chain
+              children:
+                - pipeline: regex
+                  params:
+                    action: regex_search
+                    inputs:
+                      context: state.PRE_F_MT700_35
+                    outputs:
+                      X: state.ifsearch
+                    pattern: *QUANTITY_GOODS_REGEX
+                    flags:
+                      ignorecase: True
+            - type: chain
+              children:
+              - pipeline: regex
+                params:
+                  action: regex_search
+                  inputs:
+                    context: state.PRE_F_MT700_35
+                  outputs:
+                    X: state.ifsearch
+                  pattern: (?<=TYPE OF GOODS)(?:[\ \t\:.,])+(.*)
+                  group: 1
+                  flags:
+                    ignorecase: True
+        - pipeline: resolver
+          params:
+            action: match_simple_resolver_single_key
+            inputs:
+              match_kv: state.ifsearch
+            outputs:
+              value: field.value
+              parsed_value: field.parse_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            confidence: 0.8
+            mode: all
+
+
+  - field_code: F_MT700_37
+    root:
+      type: any
+      children:
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: True
+                include_start: True
+                include_end: False
+                key: '\:\s?47A\s?\:\s?ADDITIONAL\s?CONDITIONS?' # find the key
+                term_chars: *TERM_CHARS #'default to $ if term chars is empty for multilines
+                max_line: *MAX_LINES
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: True
+                include_start: True
+                include_end: False
+                max_line: *MAX_LINES
+                key: '\:\s?47A\s?\:' # find the key
+                term_chars: '\*|((\:|t)\s?(?!(?:47))\d+[A-Z]?\s?\:)|(^F$)' # dont match itself 47A
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+  - field_code: F_MT700_41
+    root:
+      type: any
+      children:
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: True
+                include_start: True
+                include_end: False
+                key: '\:\s?48\s?\:\s?PERIOD\s?FOR\s?PRESENTATION' # find the key
+                term_chars: '(\:\s?\d+[A-Z]?\s?\:|\$)' # 'default to $ if term chars is empty for multilines, (OCR error fix using $)
+                max_line: 5
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: False
+                key: '\:\s?48\s?\:' # find the key
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: True
+                include_start: True
+                include_end: False
+                key: '\:\s?48\s?\:' # find the key
+                term_chars: '\*' # 'default to $ if term chars is empty for multilines
+                max_line: 2
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+  - field_code: F_MT700_45
+    root:
+      type: any
+      children:
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: True
+                include_start: False
+                include_end: False
+                key: '\:\s?78\s?\:\s?INSTRUCTIONS\s?TO\s?THE\s?PAYING\/ACCEPTING\/NEGOTIATING\s?BANK' # find the key
+                term_chars: '(\:\s?\d+[A-Z]?\s?\:|\$)' # 'default to $ if term chars is empty for multilines, (OCR error fix using $)
+                max_line: 30
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+        - type: chain
+          children:
+            - pipeline: utils
+              params:
+                action: do_pass
+            - pipeline: regex
+              params:
+                action: regex_key_value
+                inputs:
+                  context: intermediate.flatten
+                outputs:
+                  X: state.found
+                multi_line: True
+                include_start: True
+                include_end: False
+                key: '\:\s?78\s?\:' # find the key
+                term_chars: '\*' # 'default to $ if term chars is empty for multilines
+                max_line: 30
+                flags:
+                  ignorecase: True
+            - pipeline: resolver
+              params:
+                action: match_simple_kv_resolver
+                inputs:
+                  match_kv: state.found
+                  context: intermediate.flatten
+                outputs:
+                  value: field.value
+                  parsed_value: field.parsed_value
+                  mappings: field.mappings
+                  ocr_confidence: field.ocr_confidence
+                  extraction_confidence: field.extraction_confidence
+                  type: field.type
+                confidence: 0.99
+
+  - field_code: F_MT700_36
+    root:
+      type: chain
+      children:
+        - type: any
+          children:
+            - type: chain
+              children:
+                - pipeline: utils
+                  params:
+                    action: do_pass
+                - pipeline: regex
+                  params:
+                    action: regex_key_value
+                    inputs:
+                      context: intermediate.flatten
+                    outputs:
+                      X: state.found
+                    multi_line: True
+                    include_start: True
+                    include_end: False
+                    key: '\:\s?46A\s?\:\s?DOCUMENTS\s?REQUIRED' # find the key
+                    term_chars: *TERM_CHARS #'default to $ if term chars is empty for multilines
+                    max_line: *MAX_LINES
+                    flags:
+                      ignorecase: True
+            - type: chain
+              children:
+                - pipeline: utils
+                  params:
+                    action: do_pass
+                - pipeline: regex
+                  params:
+                    action: regex_key_value
+                    inputs:
+                      context: intermediate.flatten
+                    outputs:
+                      X: state.found
+                    multi_line: True
+                    include_start: False
+                    include_end: False
+                    max_line: *MAX_LINES
+                    key: '\:\s?46A\s?\:' # find the key
+                    term_chars: *TERM_CHARS
+                    flags:
+                      ignorecase: True
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: flatten
+          params:
+            action: match_kv_to_flatten
+            inputs:
+              context: intermediate.flatten
+              match_kv: state.found
+            outputs:
+              X: state.flatten
+        - pipeline: merge
+          params:
+            action: merge_nodes
+            inputs:
+              context: state.flatten
+            outputs:
+              X: state.merge
+        - pipeline: utils
+          params:
+            action: json_to_output
+            inputs:
+              context: state.flatten
+            output_name: 'F_MT700_36'
+        - pipeline: merge
+          params:
+            action: split_nodes
+            inputs:
+              context: state.merge
+              check_context: intermediate.flatten
+            pattern: *TOKEN_REGEX
+            outputs:
+              X: intermediate.merge
+        - pipeline: resolver
+          params:
+            action: match_simple_kv_resolver
+            inputs:
+              match_kv: state.found
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            confidence: 0.98
+
+  - field_code: PRE_AINS_MT700_35
+    skip_definite_action_check: true
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.merge
+        - pipeline: spacy
+          params:
+            action: spacy_entity_tagging_from_resource
+            inputs:
+              context: intermediate.merge
+              resource_list: resources.abbr
+            outputs:
+              X: state.merge
+        - pipeline: spacy
+          params:
+            action: spacy_entity_tagging_from_resource
+            inputs:
+              context: state.merge
+              resource_list: resources.doc_quantity
+            outputs:
+              X: state.merge
+        - pipeline: labeling
+          params:
+            action: prepare_labeling_from_entity_list
+            inputs:
+              context: state.merge
+            labels: ['doc_type','doc_quantity']
+            outputs:
+              X: state.merge
+        - pipeline: labeling
+          params:
+            action: preprocssing_between_text
+            inputs:
+              context: state.merge
+            label_a: 'doc_type'
+            label_b: 'doc_quantity'
+            outputs:
+              X: state.pre_df
+        - pipeline: labeling
+          params:
+            action: labeling_fns_docs_quantity_pair
+            inputs:
+              context: state.pre_df
+            outputs:
+              X: intermediate.pre_MT700_36A
+
+  - field_code: AINS_MT700_52
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.merge
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.merge
+            outputs:
+              X: state.merge_filter
+            filter_key: text
+            pattern: '^((?!(applicant|party)).)*$'
+        - pipeline: spacy
+          params:
+            action: spacy_entity_tagging
+            inputs:
+              context: state.merge_filter
+            pattern: '(?:notify(ing))\s*(.*?)\s*(?:,|$)'
+            label: 'notify_party'
+            group: 2
+            outputs:
+              X: state.merge
+        - pipeline: labeling
+          params:
+             action: prepare_labeling_from_entity_list
+             inputs:
+               context: state.merge
+             labels: ['notify_party']
+             outputs:
+               X: state.merge
+
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: notify_party_match_span
+            return_type: string
+            confidence: 0.8
+
+  - field_code: AINS_MT700_35
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Bill of Exchange
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_type_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_36
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Bill of Lading
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_type_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_37
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Invoice
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_type_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_38
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Packing List
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_type_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_39
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Certificate of Origin
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_type_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_40
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Beneficiary's Certificate
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_type_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_41
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: PEB
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_type_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_42
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Certificate of Analysis
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_type_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_43
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Courier Receipt
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_type_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_44
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Shipping Co. Certificate
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_type_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_45
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Ship Advise
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_type_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_46
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Health Certificate
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_type_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_47
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Test Result
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_type_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_48
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Airway Bill
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_type_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_49
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Fumigation Certificate
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_type_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_50
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Certificate of Insurance
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_type_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_51
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Certificate of Quality
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_type_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_1
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Bill of Exchange
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: org
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_3
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Bill of Lading
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: org
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_5
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Invoice
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: org
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_7
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Packing List
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: org
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_9
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Certificate of Origin
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: org
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_11
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Beneficiary's Certificate
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: org
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_13
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: PEB
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: org
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_15
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Certificate of Analysis
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: org
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_17
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Courier Receipt
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: org
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_19
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Shipping Co. Certificate
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: org
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_21
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Ship Advise
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: org
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_23
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Health Certificate
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: org
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_25
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Test Result
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: org
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_27
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Airway Bill
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: org
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_29
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Fumigation Certificate
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: org
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_31
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Certificate of Insurance
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: org
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_33
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Certificate of Quality
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: org
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+
+  - field_code: AINS_MT700_2
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Bill of Exchange
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: copy
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+  - field_code: AINS_MT700_4
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Bill of Lading
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: copy
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+  - field_code: AINS_MT700_6
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Invoice
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: copy
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+  - field_code: AINS_MT700_8
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Packing List
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: copy
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+  - field_code: AINS_MT700_10
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Certificate of Origin
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: copy
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+  - field_code: AINS_MT700_12
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Beneficiary's Certificate
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: copy
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+  - field_code: AINS_MT700_14
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: PEB
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: copy
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+  - field_code: AINS_MT700_16
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Certificate of Analysis
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: copy
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+  - field_code: AINS_MT700_18
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Courier Receipt
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: copy
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+  - field_code: AINS_MT700_20
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Shipping Co. Certificate
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: copy
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+  - field_code: AINS_MT700_22
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Ship Advise
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: copy
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+  - field_code: AINS_MT700_24
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Health Certificate
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: copy
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+  - field_code: AINS_MT700_26
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Test Result
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: copy
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+  - field_code: AINS_MT700_28
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Airway Bill
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: copy
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+  - field_code: AINS_MT700_30
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Fumigation Certificate
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: copy
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+  - field_code: AINS_MT700_32
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Certificate of Insurance
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: copy
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8
+
+
+  - field_code: AINS_MT700_34
+    root:
+      type: chain
+      children:
+        - pipeline: utils
+          params:
+            action: do_pass
+        - pipeline: utils
+          params:
+            action: check_null
+            inputs:
+              context: intermediate.pre_MT700_36A
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: intermediate.pre_MT700_36A
+            outputs:
+              X: state.merge
+            filter_key: doc_type_id
+            pattern: Certificate of Quality
+        - pipeline: flatten
+          params:
+            action: filter
+            inputs:
+              context: state.merge
+            outputs:
+              X: state.merge
+            filter_key: doc_quantity_id
+            pattern: copy
+        - pipeline: resolver
+          params:
+            action: span_resolver
+            inputs:
+              span_merge: state.merge
+              context: intermediate.flatten
+            outputs:
+              value: field.value
+              parsed_value: field.parsed_value
+              mappings: field.mappings
+              ocr_confidence: field.ocr_confidence
+              extraction_confidence: field.extraction_confidence
+              type: field.type
+            key: doc_quantity_match_span
+            return_type: string
+            confidence: 0.8

@@ -1,0 +1,92 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "required": [
+        "fields"
+    ],
+    "properties": {
+        "pre": {
+            "properties": {
+                "base_fields": {
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "fields": {
+            "type": "array",
+            "items": {
+                "required": [
+                    "field_code",
+                    "strategy"
+                ],
+                "properties": {
+                    "field_code": {
+                        "type": "string"
+                    },
+                    "strategy": {
+                        "$ref": "#/definitions/Node"
+                    },
+                    "depends": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "requires": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "IOKVMapping": {
+            "patternProperties": {
+                "^[\\w_]+$": {"type":"string", "pattern": "^(state|intermediate|field|document|resources)(\\.[^\\.]+)*$"}
+            }
+        },
+        "ParamKVMapping": {
+            "patternProperties": {
+                "^\\w+$": {}
+            }
+        },
+        "Node": {
+            "anyOf": [
+                {
+                    "additionalProperties": false,
+                    "required": ["chain"],
+                    "properties": {
+                        "chain": {
+                            "type": "array",
+                            "items": {"$ref": "#/definitions/Node"}
+                        }
+                    }
+                },
+                {
+                    "additionalProperties": false,
+                    "required": ["any"],
+                    "properties": {
+                        "any": {
+                            "type": "array",
+                            "items": {"$ref": "#/definitions/Node"}
+                        }
+                    }
+                },
+                {
+                    "additionalProperties": false,
+                    "required": ["action"],
+                    "properties": {
+                        "action": {"type": "string", "pattern": "^\\w+\\.\\w+$"},
+                        "inputs": {"$ref": "#/definitions/IOKVMapping"},
+                        "outputs": {"$ref": "#/definitions/IOKVMapping"},
+                        "params": {"$ref": "#/definitions/ParamKVMapping"}
+                    }
+                }
+            ]
+        }
+    }
+}
