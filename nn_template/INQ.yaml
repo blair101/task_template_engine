@@ -15,6 +15,38 @@ fields:
       outputs:
         X: intermediate.flatten
 
+- field_code: F_INQ_11
+  depends: [Pre_F_INQ_Flatten]
+  strategy:
+    chain:
+    - action: table_search.search_cell_by_field
+      inputs:
+        context: intermediate.flatten
+        field_info: resources.field_schema.INQ.F_INQ_11
+      outputs:
+        X: state.table_fc
+    - action: table_value_extractor.extract_str_by_cell
+      inputs:
+        context: state.table_fc
+      outputs:
+        X: state.field_values
+      params:
+        direction: right
+        nth_cell: 1
+        is_found_no_empty: True
+    - action: table_value_extractor.match_values_to_single
+      inputs:
+        context: state.field_values
+      outputs:
+        X: state.field_v
+      params:
+        nth_value: 2
+    - action: table_resolver.match_values_resolver_single
+      inputs:
+        match_kv: state.field_v
+      outputs:
+        value_info_list: field.value_info_list
+        
 - field_code: F_INQ_15
   depends: [Pre_F_INQ_Flatten]
   strategy:
