@@ -44,15 +44,6 @@ def __init__(self, func, name=None, definite=False, kargs_schema=None, return_va
     self.definite = definite
     self.kargs_schema = kargs_schema
     self.return_value_schema = return_value_schema
-    if kargs_schema:
-        self.kargs_schema_validator = Draft7Validator(kargs_schema)
-    else:
-        self.kargs_schema_validator = None
-
-    if return_value_schema:
-        self.return_value_schema_validator = Draft7Validator(return_value_schema)
-    else:
-        self.return_value_schema_validator = None
 
     self.input_args = input_args
     self.param_args = param_args
