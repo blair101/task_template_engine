@@ -43,8 +43,8 @@ def __init__(self, func, name=None, definite=False, kargs_schema=None, return_va
     self.name = name
     self.func = func
     self.definite = definite
-    self.kargs_schema = kargs_schema
-    self.return_value_schema = return_value_schema
+    # self.kargs_schema = kargs_schema
+    # self.return_value_schema = return_value_schema
 
     self.input_args = input_args
     self.param_args = param_args
