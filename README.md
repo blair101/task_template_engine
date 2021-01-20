@@ -10,7 +10,7 @@ class Api:
         self.description = description
 ```
 
-## Namespace（action_group_name）
+## Namespace (action_group_name)
 
 ```python
 class Namespace(object):
