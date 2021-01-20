@@ -38,6 +38,7 @@ class Action:
     name: str
     func: Callable
     definite: bool
+    
 def __init__(self, func, name=None, definite=False, kargs_schema=None, return_value_schema=None, input_args=None, param_args=None):
     self.name = name
     self.func = func
