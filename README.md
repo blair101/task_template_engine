@@ -1,6 +1,6 @@
 # task_template_engine
 
-## Api (namespace list)
+## Api (namespaces)
 
 ```python
 class Api:
