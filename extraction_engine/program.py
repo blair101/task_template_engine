@@ -13,44 +13,44 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def _build_strategy_tpl_index(tpls, group_by):
-        groups = defaultdict(list)
-        grouped = defaultdict(dict)
-        base_fields = defaultdict(list)
-        for it in tpls:
-            group = tuple(it['labels'][k] for k in group_by)
-            for ite in it['document']['fields']:
-                grouped[group][ite['field_code']] = ite
-                groups[group].append(ite['field_code'])
 
-            for ite in pydash.get(it, ['document', 'pre', 'base_fields']) or []:
-                base_fields[group].append(ite)
-            
-        return grouped, groups, base_fields
+def _build_strategy_tpl_index(tpls, group_by):
+    groups = defaultdict(list)
+    grouped = defaultdict(dict)
+    base_fields = defaultdict(list)
+    for it in tpls:
+        group = tuple(it['labels'][k] for k in group_by)
+        for ite in it['document']['fields']:
+            grouped[group][ite['field_code']] = ite
+            groups[group].append(ite['field_code'])
+
+        for ite in pydash.get(it, ['document', 'pre', 'base_fields']) or []:
+            base_fields[group].append(ite)
+
+    return grouped, groups, base_fields
 
 
 class Program:
-    def __init__(self, strategy_templates_loader, action_loader, resource_loader, event_handlers, group_by):
+    def __init__(self, strategy_templates_loader, action_loader, resource_loader, group_by):
         self.validator = ProgramValidator()
 
         strategy_templates = list(strategy_templates_loader())
         apis = list(action_loader())
 
         self.validator.validate_program_strategy_and_actions(
-            strategy_templates, 
-            [ns  for api in apis for ns in api.namespaces], 
+            strategy_templates,
+            [ns for api in apis for ns in api.namespaces],
             group_by)
 
         # _validate_strategy_templates(strategy_templates)
-        self.field_by_group_code, self.groups, self.base_fields = _build_strategy_tpl_index(strategy_templates, group_by)
+        self.field_by_group_code, self.groups, self.base_fields = _build_strategy_tpl_index(strategy_templates,
+                                                                                            group_by)
         self.strategy_templates = strategy_templates
 
-
         self.actions_by_ns = {
-            ns.name: ns  for api in apis for ns in api.namespaces
+            ns.name: ns for api in apis for ns in api.namespaces
         }
 
-        self.handlers = event_handlers
         self.resource_loader = resource_loader
         # _validate_program_strategy_and_actions(
         #     [ns  for api in apis for ns in api.namespaces], 
@@ -59,7 +59,6 @@ class Program:
         self.group_key_index = {
             it: idx for idx, it in enumerate(group_by)
         }
-
 
     def run(self, fields, document, groups):
         resources = self.resource_loader()
@@ -91,7 +90,7 @@ class Program:
                     if it in failed:
                         dependency_failed = True
                         break
-                        
+
                 if dependency_failed:
                     failed.add(field_code)
                     failed_fields.append({
@@ -126,7 +125,6 @@ class Program:
                         "cause": "STRATEGY_FAILED"
                     })
 
-            
         return Result(values, failed_fields, [])
 
     def _evaluate_field_strategy(self, group, field_code, context):
@@ -175,7 +173,6 @@ class Program:
                 return copy, success
             else:
                 raise ValueError(f'Unkonw node type')
-                
 
     def _visit(self, visited, group, field_code):
         if field_code in visited:
@@ -193,7 +190,7 @@ class Program:
 
         for item in field.get('requires') or []:
             yield from self._visit(visited, group, item)
-        
+
         yield field_code
 
     def get_fields_in_group(self, group):
@@ -203,11 +200,11 @@ class Program:
     def _group_match(self, group, criteria):
         if not criteria:
             return True
-        
+
         for k, v in criteria.items():
             if group[self.group_key_index[k]] != v:
                 return False
-        
+
         return True
 
     def get_all_groups(self, **kargs):
@@ -219,14 +216,16 @@ class Program:
             if self._group_match(group, kargs):
                 for it in self.get_fields_in_group(group):
                     acc.add(it)
-            
+
         return list(acc)
-    
+
+
 def _extract_args(ns: Namespace, action: Action, context: Dict, strategy: Dict):
     if action.kargs_schema:
         return _extract_args_v2(ns, action, context, strategy)
     else:
         return _extract_args_v1(ns, action, context, strategy)
+
 
 def _extract_args_v2(ns: Namespace, action: Action, context: Dict, strategy: Dict):
     properties = pydash.get(action.kargs_schema, ['properties']) or {}
@@ -235,7 +234,7 @@ def _extract_args_v2(ns: Namespace, action: Action, context: Dict, strategy: Dic
     }
 
     args = {}
-    
+
     for key in action.input_args or []:
         path = pydash.get(strategy, ['inputs', key])
         if path is None:
@@ -266,7 +265,7 @@ def _extract_args_v1(ns: Namespace, action: Action, context: Dict, strategy: Dic
             value = context
         else:
             value = pydash.get(context, path)
-            
+
         pydash.set_(args, key, value)
 
     for key, definition in expects_params.items():
@@ -282,6 +281,7 @@ def _write_output(context, outputs, ns, action, strategy, success):
     else:
         return _write_output_v1(context, outputs, ns, action, strategy, success)
 
+
 def _write_output_v2(context, outputs, ns, action: Action, strategy, success):
     properties = pydash.get(action.return_value_schema, ['properties']) or {}
 
@@ -291,6 +291,7 @@ def _write_output_v2(context, outputs, ns, action: Action, strategy, success):
         pydash.set_(context, path, value)
 
     return context
+
 
 def _write_output_v1(context, outputs, ns, action, strategy, success):
     expects_outputs = pydash.get(ns.expects, [action.func, 'outputs'], dict())
@@ -303,12 +304,8 @@ def _write_output_v1(context, outputs, ns, action, strategy, success):
     return context
 
 
-class Handler:
-    pass
-
 class Result:
     def __init__(self, values, failed_fields, stats):
         self.values = values
         self.failed_fields = failed_fields
         self.stats = stats
-    

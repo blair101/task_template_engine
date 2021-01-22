@@ -2,8 +2,8 @@
 import re
 from ruamel.yaml.comments import CommentedSeq
 
-class Raw(object):
 
+class Raw(object):
     type_name = "raw"
 
     def __init__(self, default=None, description=None, reference=None, required=None, example=None, **kwargs):
@@ -17,7 +17,7 @@ class Raw(object):
     def is_valid_value(self, value):
         return True
 
-    def generate_schema_reference(self,value):
+    def generate_schema_reference(self, value):
         if value:
             re_m = re.search(r'^#([a-zA-z\_\d]+)', value)
             if re_m:
@@ -31,7 +31,6 @@ class Raw(object):
 
 
 class String(Raw):
-
     type_name = "string"
 
     def __init__(self, *args, **kwargs):
@@ -42,7 +41,6 @@ class String(Raw):
 
 
 class Integer(Raw):
-
     type_name = "integer"
 
     def __init__(self, *args, **kwargs):
@@ -53,7 +51,6 @@ class Integer(Raw):
 
 
 class Float(Raw):
-
     type_name = "float"
 
     def __init__(self, *args, **kwargs):
@@ -64,7 +61,6 @@ class Float(Raw):
 
 
 class Regex(Raw):
-
     type_name = "regex"
 
     def __init__(self, *args, **kwargs):
@@ -81,7 +77,6 @@ class Regex(Raw):
 
 
 class Boolean(Raw):
-
     type_name = "boolean"
 
     def __init__(self, *args, **kwargs):
@@ -92,7 +87,6 @@ class Boolean(Raw):
 
 
 class Structured(Raw):
-
     type_name = "structured"
 
     def __init__(self, schema='', *args, **kwargs):
@@ -105,7 +99,6 @@ class Structured(Raw):
 
 
 class List(Raw):
-
     type_name = "list"
 
     def __init__(self, schema='', *args, **kwargs):
