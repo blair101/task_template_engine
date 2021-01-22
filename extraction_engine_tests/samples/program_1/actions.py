@@ -1,5 +1,6 @@
 from extraction_engine.strategy_decorator import Api, fields
 import math
+
 api = Api()
 
 ns_math = api.namespace('math')
@@ -8,30 +9,36 @@ ns_math = api.namespace('math')
 @ns_math.action_ns()
 class MathActions:
 
-    @ns_math.action(kargs_schema={"properties":{"x": {"type": "number", "default": 3.14159}}}, 
-                    return_value_schema={"properties":{"x": {"type":"number"}}},
-                    input_args=['x'])
+    @ns_math.action()
+    @ns_math.expect_inputs(
+        {
+            "x": fields.Integer()
+        }
+    )
+    @ns_math.expect_outputs({
+        "x": fields.Integer()
+    })
     @ns_math.doc("""
     
     """)
     def pi(self, x):
         return {
-            "x": x
-        }, True
+                   "x": x
+               }, True
 
-    @ns_math.action(kargs_schema={"properties":{"x": {"items": {"type": "number"}}}}, 
-                    return_value_schema={"properties":{"x": {"type":"number"}}},
+    @ns_math.action(kargs_schema={"properties": {"x": {"items": {"type": "number"}}}},
+                    return_value_schema={"properties": {"x": {"type": "number"}}},
                     input_args=['x'])
     @ns_math.doc("""
     
     """)
     def sum(self, x):
         return {
-            "x": sum(x)
-        }, True
+                   "x": sum(x)
+               }, True
 
-    @ns_math.action(kargs_schema={"properties":{"x": {"items": {"type": "number"}}}}, 
-                    return_value_schema={"properties":{"x": {"type":"number"}}},
+    @ns_math.action(kargs_schema={"properties": {"x": {"items": {"type": "number"}}}},
+                    return_value_schema={"properties": {"x": {"type": "number"}}},
                     input_args=['x'])
     @ns_math.doc("""
     
@@ -44,20 +51,19 @@ class MathActions:
             acc += (i - mean) ** 2 / m
 
         return {
-            "x": math.sqrt(acc)
-        }, True
+                   "x": math.sqrt(acc)
+               }, True
 
-
-    @ns_math.action(kargs_schema={"properties":{"x1": {"type": "number"}, "x2": {"type": "number"}, }}, 
-                    return_value_schema={"properties":{"x": {"type":"number"}}},
+    @ns_math.action(kargs_schema={"properties": {"x1": {"type": "number"}, "x2": {"type": "number"}, }},
+                    return_value_schema={"properties": {"x": {"type": "number"}}},
                     input_args=['x1', 'x2'])
     @ns_math.doc("""
     
     """)
     def divide(self, x1, x2):
         return {
-            "x": x1 / x2
-        }, True
+                   "x": x1 / x2
+               }, True
 
 
 ns_list = api.namespace('list')
@@ -79,8 +85,8 @@ class ListActions:
     @ns_list.expect_params({})
     def len(self, x):
         return {
-            "x": len(x)
-        }, True
+                   "x": len(x)
+               }, True
 
 
 ns_utils = api.namespace('utils')
@@ -102,5 +108,5 @@ class UtilActions:
     @ns_utils.expect_params({})
     def write_field_value(self, x):
         return {
-            "x": x
-        }, True
+                   "x": x
+               }, True
