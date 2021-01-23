@@ -1,5 +1,29 @@
 # task_template_engine
 
+## Example
+
+```yaml
+document_type: STATS
+pre:
+  define:
+    TERM_CHARS: &TERM_CHARS ((\:|t)\s?\d+[A-Z]?\s?\:)|(^\*\*)|(^F$)   # t is to fix error such as t47A:
+
+  resources:
+  - ports
+  - countries
+  - currencies
+
+  base_fields:
+  - pi
+
+fields:
+- field_code: pi
+  strategy: 
+    action: math.pi
+    outputs:
+      x: intermediate.PI
+```
+
 ## Api (namespaces)
 
 ```python
@@ -44,28 +68,4 @@ def __init__(self, func, name=None, definite=False, kargs_schema=None, return_va
 
     self.input_args = input_args
     self.param_args = param_args
-```
-
-## Example
-
-```yaml
-document_type: STATS
-pre:
-  define:
-    TERM_CHARS: &TERM_CHARS ((\:|t)\s?\d+[A-Z]?\s?\:)|(^\*\*)|(^F$)   # t is to fix error such as t47A:
-
-  resources:
-  - ports
-  - countries
-  - currencies
-
-  base_fields:
-  - pi
-
-fields:
-- field_code: pi
-  strategy: 
-    action: math.pi
-    outputs:
-      x: intermediate.PI
 ```
