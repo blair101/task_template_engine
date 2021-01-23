@@ -1,1 +1,0 @@
-# A working demo of the sixe_field_extraction action invocation
