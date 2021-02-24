@@ -79,3 +79,467 @@ fields:
         match_kv: state.field_v
       outputs:
         value_info_list: field.value_info_list
+
+##### DBS/BKS.yaml ##### 
+
+pre:
+  define:
+    JQ_FIRST_VALUE: &JQ_FIRST_VALUE 'del(.value) + {value: [.value[0]]}'
+    JQ_LAST_KEY: &JQ_LAST_KEY '.[-1]'
+    JQ_FIRST_KEY: &JQ_FIRST_KEY '.[0]'
+    CURRENCY_DIGITS_REGEX: &CURRENCY_DIGITS_REGEX '(^\d*([ ,.]*\d{3})*[.]\s*\d{1,2})(?=\D|$)'
+    DATE_REGEX: &DATE_REGEX '[0-3]?[0-9][\ \t\,\/\.\-]((January|February|March|April|May|June|July|August|September|October|November|December|Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|sep|Oct|Nov|Dec)|(\d\d))[\ \t\,\/\.\-][1-2][0-9]\s?\d?\s?\d?' # 05/06/20
+    COMPANY_NAMES_REGEX: &COMPANY_NAMES_REGEX '(PT(\.|\s)|limited|\bltd\b|\bsdn\b|\bbhd\b|company|\bcorp\b|\bLLC\b)'
+    OPENING_BALANCE_REGEX: &OPENING_BALANCE_REGEX 'opening\s*balance\s*:*|balance\s*brought\s*forward\s*:*'
+    CLOSING_BALANCE_REGEX: &CLOSING_BALANCE_REGEX '((closing|ledger)\s*balance\s*:*)|(for\s*(closing|ledger)\s*balance\s*:*)|(balance\s*carried\s*forward\s*:*)'
+fields:
+  - field_code: Pre_DBS_Flatten
+    strategy:
+      chain:
+        - action: flatten.documents_to_flatten
+          inputs:
+            context: document
+          outputs:
+            X: intermediate.flatten
+  - field_code: Pre_BANK_Check
+    requires: [Pre_DBS_Flatten]
+    strategy:
+      any: # search for dbs on the top
+      - chain:
+        - action: flatten.filter
+          inputs:
+            context: intermediate.flatten
+          outputs:
+            X: intermediate.first_page
+          params:
+            pattern: '0'
+            filter_key: 'page'
+        - action: regex.regex_search
+          inputs:
+            context: intermediate.first_page
+          outputs:
+            X: state.found_bank
+          params:
+            pattern: 'DBS$'
+            flags:
+              ignorecase: False
+      - chain: # # search for specific dbs document format
+        - action: flatten.filter
+          inputs:
+            context: intermediate.flatten
+          outputs:
+            X: intermediate.first_page
+          params:
+            pattern: '0'
+            filter_key: 'page'
+        - action: flatten.assert_keywords
+          inputs:
+            context: intermediate.first_page
+          outputs:
+            X: state.found_bank
+          params:
+            patterns: ['Value Date','Running Balance']
+            flags:
+              ignorecase: False
+              
+  - field_code: Pre_F_BKS_Page_Row_Count # Bank statement table
+    requires: [Pre_BANK_Check]
+    strategy:
+      chain:
+        - action: flatten.filter_between
+          inputs:
+            context: intermediate.flatten
+          outputs:
+            X: state.new_flatten
+          params:
+            start_pattern: 'Balance Brought F'
+            end_pattern: 'Balance Carried F'
+            include_start: True
+            include_end: False
+            flags:
+              ignorecase: True
+        - action: table_value_extractor.search_row_count
+          inputs:
+            context: state.new_flatten
+          outputs:
+            X: intermediate.page_to_row_count
+          params:
+            patterns: ['\d+\s*Jan|Dec']
+            ratio: 5
+
+  - field_code: F_BKS_C1_1_Transaction_Date # Bank statement table
+    depends: [Pre_F_BKS_Page_Row_Count]
+    strategy:
+      chain:
+        - action: flatten.filter_between
+          inputs:
+            context: intermediate.flatten
+          outputs:
+            X: state.new_flatten
+          params:
+            start_pattern: 'Balance Brought F'
+            end_pattern: 'Balance Carried F'
+            include_start: True
+            include_end: False
+            flags:
+              ignorecase: True
+        - action: regex.regex_search
+          inputs:
+            context: state.new_flatten
+          outputs:
+            X: state.ifsearch
+          params:
+            pattern: 'Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec'
+            flags:
+              ignorecase: true
+        - action: regex.locate_value_from_key_using_sliding_window
+          inputs:
+            context: state.new_flatten
+            keys: state.ifsearch
+          outputs:
+            X: state.found
+          params:
+            drop_self_match: false
+            remove_key_from_match: false
+            bbox_expand_ratio: [1.0, 1.0, 1.0, 2.8]
+            direction: down
+            stop_call_back_fn: EmptyOverlapCB
+        - action: regex.match_filter
+          inputs:
+            context: state.found
+          outputs:
+            X: state.found
+          params:
+            pattern: '(?:)(\d+\s*Jan|\d+\s*Feb|\d+\s*Mar|\d+\s*Apr|\d+\s*May|\d+\s*Jun|\d+\s*Jul|\d+\s*Aug|\d+\s*Sep|\d+\s*Oct|\d+\s*Nov|\d+\s*Dec)'
+            group: 1
+            flags:
+              ignorecase: true
+        - action: table_value_extractor.save_first_match_kv_with_page
+          inputs:
+            context: state.new_flatten
+            match_kv: state.found
+          outputs:
+            X: intermediate.first_match_kv_transaction_date
+        - action: table_resolver.match_kv_resolver_to_multi_page_col_texts
+          inputs:
+            match_kv: intermediate.first_match_kv_transaction_date
+          outputs:
+            ori_value: field.ori_value
+            value: field.value
+            uuids: field.uuids
+            extraction_confidence: field.extraction_confidence
+            ocr_confidence: field.ocr_confidence
+            type: field.type
+
+  - field_code: F_BKS_C1_2_Transaction_Description # Bank statement table
+    depends: [Pre_F_BKS_Page_Row_Count, F_BKS_C1_1_Transaction_Date]
+    strategy:
+      any:
+      - chain:
+        - action: flatten.filter_between
+          inputs:
+            context: intermediate.flatten
+          outputs:
+            X: state.new_flatten
+          params:
+            start_pattern: 'Balance Brought F'
+            end_pattern: 'Balance Carried F'
+            include_start: True
+            include_end: False
+            flags:
+              ignorecase: True
+        - action: regex.regex_search
+          inputs:
+            context: state.new_flatten
+          outputs:
+            X: state.ifsearch_x
+          params:
+            pattern: 'Balance Brought F'
+#            pattern: 'OF TRANSACTION|OF TRANSACTION|OF\s*TUNATION|OF TINGACTION|OF MANSACTION|OF TUNATION|OF\s*YANSACT'
+            flags:
+              ignorecase: false
+        - action: flatten.match_kv_to_flatten
+          inputs:
+            context: state.new_flatten
+            match_kv: state.ifsearch_x
+          params:
+            filter_type: key
+          outputs:
+            X: state.found_pages_x
+        - action: table_value_extractor.search_column_value
+          inputs:
+            context: intermediate.flatten
+            match_node: state.found_pages_x # ifsearch_x , search node_id's bbox
+            match_kv: intermediate.first_match_kv_transaction_date
+          params:
+            pattern: '(?:\d+\s*Jan\s*|\d+\s*Feb\s*|\d+\s*Mar\s*|\d+\s*Apr\s*|\d+\s*May\s*|\d+\s*Jun\s*|\d+\s*Jul\s*|\d+\s*Aug\s*|\d+\s*Sep\s*|\d+\s*Oct\s*|\d+\s*Nov\s*|\d+\s*Dec\s*)?(.+)'
+            group: 1
+            flags:
+              ignorecase: true
+            merge_model: 'all'
+          outputs:
+            X: state.match_kv_with_page
+        - action: table_resolver.match_kv_resolver_to_multi_page_col_texts
+          inputs:
+            match_kv: state.match_kv_with_page
+          outputs:
+            ori_value: field.ori_value
+            value: field.value
+            uuids: field.uuids
+            extraction_confidence: field.extraction_confidence
+            ocr_confidence: field.ocr_confidence
+            type: field.type
+      - chain:
+        - action: flatten.filter_between
+          inputs:
+            context: intermediate.flatten
+          outputs:
+            X: state.new_flatten
+          params:
+            start_pattern: 'Balance Brought F'
+            end_pattern: 'Balance Carried F'
+            include_start: True
+            include_end: False
+            flags:
+              ignorecase: True
+        - action: regex.regex_search
+          inputs:
+            context: state.new_flatten
+          outputs:
+            X: state.ifsearch
+          params:
+            pattern: 'Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec'
+            flags:
+              ignorecase: true
+        - action: regex.locate_value_from_key_using_sliding_window
+          inputs:
+            context: state.new_flatten
+            keys: state.ifsearch
+          outputs:
+            X: state.found
+          params:
+            drop_self_match: false
+            remove_key_from_match: false
+            bbox_expand_ratio: [1.0, 1.0, 1.0, 2.8]
+            direction: down
+            stop_call_back_fn: EmptyOverlapCB
+        - action: regex.match_filter
+          inputs:
+            context: state.found
+          outputs:
+            X: state.found
+          params:
+            pattern: '(?:\d+\s*Jan\s*|\d+\s*Feb\s*|\d+\s*Mar\s*|\d+\s*Apr\s*|\d+\s*May\s*|\d+\s*Jun\s*|\d+\s*Jul\s*|\d+\s*Aug\s*|\d+\s*Sep\s*|\d+\s*Oct\s*|\d+\s*Nov\s*|\d+\s*Dec\s*)(.+)'
+            group: 1
+            flags:
+              ignorecase: true
+        - action: table_value_extractor.save_first_match_kv_with_page
+          inputs:
+            context: state.new_flatten
+            match_kv: state.found
+          outputs:
+            X: state.first_match_kv_transaction_desc
+        - action: table_resolver.match_kv_resolver_to_multi_page_col_texts
+          inputs:
+            match_kv: state.first_match_kv_transaction_desc
+          outputs:
+            ori_value: field.ori_value
+            value: field.value
+            uuids: field.uuids
+            extraction_confidence: field.extraction_confidence
+            ocr_confidence: field.ocr_confidence
+            type: field.type
+
+  - field_code: F_BKS_C1_3_Withdrawal
+    depends: [F_BKS_C1_1_Transaction_Date]
+    strategy:
+      chain:
+        - action: flatten.filter_between
+          inputs:
+            context: intermediate.flatten
+          outputs:
+            X: state.new_flatten
+          params:
+            start_pattern: 'Details of Your|of Your DBS|of Your Des|of your pps'
+            end_pattern: 'Balance Carried F'
+            include_start: True
+            include_end: False
+            flags:
+              ignorecase: True
+        - action: regex.regex_search
+          inputs:
+            context: state.new_flatten
+          outputs:
+            X: state.ifsearch_x
+          params:
+            pattern: 'Account No|Account Na|Account.No|Accounl No'
+#            pattern: 'WITAL|WERAWALS|WITHORAWAL\s*SI|WORAWAUS|WITHDRAW|WITHDRAWA|WITHDRAINAL|WITHDRAWALISI|WITHDRAWAL|WITHDRA|WITHDAINAL|WITHDRAINALI|WITHDRAINA|WIRAWAL|THAI'
+            flags:
+              ignorecase: false
+        - action: flatten.match_kv_to_flatten
+          inputs:
+            context: state.new_flatten
+            match_kv: state.ifsearch_x
+          params:
+            filter_type: key
+          outputs:
+            X: state.found_pages_x
+        - action: table_value_extractor.search_column_value
+          inputs:
+            context: intermediate.flatten
+            match_node: state.found_pages_x # ifsearch_x , search node_id's bbox
+            match_kv: intermediate.first_match_kv_transaction_date
+          params:
+            bbox_expand_ratio: [2, 1, -0.15, 1]
+            pattern: '\d+(\.|,| |, |. )\d+(\.|,| |, |. )\d+|\d+(\.|,| |, |. )\d+|\d+'
+            merge_mode: 'first'
+          outputs:
+            X: state.match_kv_with_page
+        - action: table_resolver.match_kv_resolver_to_multi_page_col_texts
+          inputs:
+            match_kv: state.match_kv_with_page
+          outputs:
+            ori_value: field.ori_value
+            value: field.value
+            uuids: field.uuids
+            extraction_confidence: field.extraction_confidence
+            ocr_confidence: field.ocr_confidence
+            type: field.type
+
+
+  - field_code: F_BKS_C1_4_Deposit
+    depends: [F_BKS_C1_1_Transaction_Date]
+    strategy:
+      chain:
+        - action: flatten.filter_between
+          inputs:
+            context: intermediate.flatten
+          outputs:
+            X: state.new_flatten
+          params:
+            start_pattern: 'Details of Your|of Your DBS|of Your Des|of your pps'
+            end_pattern: 'Balance Carried F'
+            include_start: True
+            include_end: False
+            flags:
+              ignorecase: True
+        - action: regex.regex_search
+          inputs:
+            context: state.new_flatten
+          outputs:
+            X: state.ifsearch_x
+          params:
+            pattern: 'Account No|Account Na|Account.No|Accounl No'
+#            pattern: EPOSIS|DEPOS|DEPOSIT|DEPOSYS|DE POISTIS|DE POSTS|DEP|TOPS|PES|DEP'
+            flags:
+              ignorecase: false
+        - action: flatten.match_kv_to_flatten
+          inputs:
+            context: state.new_flatten
+            match_kv: state.ifsearch_x
+          params:
+            filter_type: key
+          outputs:
+            X: state.found_pages_x
+        - action: table_value_extractor.search_column_value
+          inputs:
+            context: intermediate.flatten
+            match_node: state.found_pages_x # ifsearch_x , search node_id's bbox
+            match_kv: intermediate.first_match_kv_transaction_date
+          params:
+            bbox_expand_ratio: [1, 1, 0.5, 1]
+            pattern: '\d+(\.|,| |, |. )\d+(\.|,| |, |. )\d+|\d+(\.|,| |, |. )\d+|\d+'
+            merge_mode: 'first'
+          outputs:
+            X: state.match_kv_with_page
+        - action: table_resolver.match_kv_resolver_to_multi_page_col_texts
+          inputs:
+            match_kv: state.match_kv_with_page
+          outputs:
+            ori_value: field.ori_value
+            value: field.value
+            uuids: field.uuids
+            extraction_confidence: field.extraction_confidence
+            ocr_confidence: field.ocr_confidence
+            type: field.type
+
+  - field_code: F_BKS_C1_5_Balance
+    depends: [F_BKS_C1_1_Transaction_Date]
+    strategy:
+      chain:
+        - action: flatten.filter_between
+          inputs:
+            context: intermediate.flatten
+          outputs:
+            X: state.new_flatten
+          params:
+            start_pattern: 'Details of Your|of Your DBS|of Your Des|of your pps'
+            end_pattern: 'Balance Carried F'
+            include_start: True
+            include_end: False
+            flags:
+              ignorecase: True
+        - action: regex.regex_search
+          inputs:
+            context: state.new_flatten
+          outputs:
+            X: state.ifsearch_x
+          params:
+            pattern: 'Account No|Account Na|Account.No|Accounl No'
+#            pattern: 'BALAN|LANCE|PLANET|LALA|BAL|BANCO|MALACE'
+            flags:
+              ignorecase: false
+        - action: flatten.match_kv_to_flatten
+          inputs:
+            context: state.new_flatten
+            match_kv: state.ifsearch_x
+          params:
+            filter_type: key
+          outputs:
+            X: state.found_pages_x
+        - action: table_value_extractor.search_column_value
+          inputs:
+            context: intermediate.flatten
+            match_node: state.found_pages_x # ifsearch_x , search node_id's bbox
+            match_kv: intermediate.first_match_kv_transaction_date
+          params:
+            bbox_expand_ratio: [0.4, 1, 1.5, 1]
+            pattern: '\d+(\.|,| |, |. )\d+(\.|,| |, |. )\d+|\d+(\.|,| |, |. )\d+|\d+'
+            merge_mode: 'first'
+          outputs:
+            X: state.match_kv_with_page
+        - action: table_resolver.match_kv_resolver_to_multi_page_col_texts
+          inputs:
+            match_kv: state.match_kv_with_page
+          outputs:
+            ori_value: field.ori_value
+            value: field.value
+            uuids: field.uuids
+            extraction_confidence: field.extraction_confidence
+            ocr_confidence: field.ocr_confidence
+            type: field.type
+
+  - field_code: F_BKS_C1
+    depends: [F_BKS_C1_1_Transaction_Date, F_BKS_C1_2_Transaction_Description, F_BKS_C1_3_Withdrawal, F_BKS_C1_4_Deposit, F_BKS_C1_5_Balance]
+    strategy:
+      chain:
+      - action: table_resolver.build_table_by_sub_fields_col
+        inputs:
+          context: fields
+        params:
+          row_std_codes: ["F_BKS_C1_1_Transaction_Date", "F_BKS_C1_2_Transaction_Description", "F_BKS_C1_3_Withdrawal", "F_BKS_C1_4_Deposit", "F_BKS_C1_5_Balance"]
+          field_codes: [
+            ["F_BKS_C1_1_Transaction_Date", "Transaction Date"],
+            ["F_BKS_C1_2_Transaction_Description", "Transaction Description"],
+            ["F_BKS_C1_3_Withdrawal", "Withdrawal"],
+            ["F_BKS_C1_4_Deposit", "Deposit"],
+            ["F_BKS_C1_5_Balance", "Balance"]
+          ]
+#          page_to_row_count: {}
+        outputs:
+          ori_value: field.ori_value
+          value: field.value
+          uuids: field.uuids
+          extraction_confidence: field.extraction_confidence
+          ocr_confidence: field.ocr_confidence
+          type: field.type
