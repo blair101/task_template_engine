@@ -119,16 +119,16 @@ field
 
 ```python
 def _evaluate_field_strategy(self, group, field_code, context):
-    """
-    "strategy": {
-      "action": "math.pi",
-      "outputs": {
-        "x": "intermediate.PI"
-      }
-    }
-    """
     field = self.field_by_group_code[group][field_code]
     ret = self._transform(field['strategy'], context)
+    """
+      "strategy": {
+        "action": "math.pi",
+        "outputs": {
+          "x": "intermediate.PI"
+        }
+      }
+    """
     return ret
 
 def _transform(self, stragety_node, context):
