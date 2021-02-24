@@ -90,7 +90,6 @@ p.run(fields=['mean', 'std'], document=[1, 2, 3, 4], groups=[('rule_based',)])
 ## 2. one-field
 
 ```python
-# context 贯穿始终
 context = {
     "state": {},
     "intermediate": intermediate,
@@ -98,6 +97,7 @@ context = {
     "document": pydash.clone_deep(document),
     "resources": resources
 }
+# context 贯穿始终
 ```
 
 > intermediate, state 维持变量作用域
