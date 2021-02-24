@@ -15,6 +15,31 @@ fields:
       outputs:
         X: intermediate.flatten
 
+## FS.yaml
+
+- field_code: E_PL_1
+  depends: [Pre_F_AR_Cover_Meta]
+  strategy:
+    chain:
+    - action: table_search.search_cell_by_ar_field
+      inputs:
+        context: intermediate.flatten
+        field_info: resources.field_schema.FS.E_PL_1
+      outputs:
+        X: state.table_fc
+    - action: table_value_extractor.extract_ar_field_year_value_by_cell
+      inputs:
+        context: state.table_fc
+      outputs:
+        X: state.yfv_list
+    - action: table_resolver.merge_ar_match_values_resolver
+      inputs:
+        match_kv: state.yfv_list
+      outputs:
+        value_info_list: field.value_info_list
+
+## INQ.yaml
+
 - field_code: F_INQ_11
   depends: [Pre_F_INQ_Flatten]
   strategy:
