@@ -153,7 +153,9 @@ def _transform(self, stragety_node, context):
         return return_context, success
 ```
 
-## Api (namespaces)
+## 4. action 的封装
+
+### Api (namespaces)
 
 ```python
 class Api:
@@ -163,7 +165,7 @@ class Api:
         self.description = description
 ```
 
-## Namespace (action_group_name)
+### Namespace (action_group_name)
 
 ```python
 class Namespace(object):
@@ -184,7 +186,7 @@ def __init__(self, name, description=None, path=None, decorators=None, validate=
     self.action_by_name = {}
 ```
 
-## Action
+### Action
 
 ```python
 class Action:
