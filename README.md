@@ -90,6 +90,7 @@ p.run(fields=['mean', 'std'], document=[1, 2, 3, 4], groups=[('rule_based',)])
 ## 2. one-field
 
 ```python
+# context 贯穿始终
 context = {
     "state": {},
     "intermediate": intermediate,
